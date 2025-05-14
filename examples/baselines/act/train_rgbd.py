@@ -83,7 +83,7 @@ class Args:
     # Transformer
     enc_layers: int = 2
     dec_layers: int = 4
-    dim_feedforward: int = 512
+    ffn_dim: int = 512
     hidden_dim: int = 256
     dropout: float = 0.1
     nheads: int = 8

@@ -128,12 +128,12 @@ def build_encoder(args):
     d_model = args.hidden_dim # 256
     dropout = args.dropout # 0.1
     nhead = args.nheads # 8
-    dim_feedforward = args.dim_feedforward # 2048
+    ffn_dim = args.ffn_dim # 2048
     num_encoder_layers = args.enc_layers # 4 # TODO shared with VAE decoder
     normalize_before = args.pre_norm # False
     activation = "relu"
 
-    encoder_layer = TransformerEncoderLayer(d_model, nhead, dim_feedforward,
+    encoder_layer = TransformerEncoderLayer(d_model, nhead, ffn_dim,
                                             dropout, activation, normalize_before)
     encoder_norm = nn.LayerNorm(d_model) if normalize_before else None
     encoder = TransformerEncoder(encoder_layer, num_encoder_layers, encoder_norm)
