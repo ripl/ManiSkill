@@ -69,9 +69,9 @@ class Panda(BaseAgent):
     arm_damping = 1e2
     arm_force_limit = 100
 
-    gripper_stiffness = 1e3
-    gripper_damping = 1e2
-    gripper_force_limit = 100
+    gripper_stiffness = 3e3
+    gripper_damping = 2e2
+    gripper_force_limit = 300
 
     @property
     def _controller_configs(self):
@@ -176,7 +176,7 @@ class Panda(BaseAgent):
         # However, tune a good force limit to have a good mimic behavior
         gripper_pd_joint_pos = PDJointPosMimicControllerConfig(
             self.gripper_joint_names,
-            lower=-0.01,  # a trick to have force when the object is thin
+            lower=-0.03,  # push harder on thin objects by commanding a more closed target
             upper=0.04,
             stiffness=self.gripper_stiffness,
             damping=self.gripper_damping,

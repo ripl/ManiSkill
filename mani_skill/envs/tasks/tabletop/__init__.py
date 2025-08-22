@@ -1,5 +1,6 @@
 from .assembling_kits import AssemblingKitsEnv
 from .lift_peg_upright import LiftPegUprightEnv
+from .lift_peg_upright_rand import LiftPegUprightRandEnv
 from .peg_insertion_side import PegInsertionSideEnv
 from .pick_clutter_ycb import PickClutterYCBEnv
 from .pick_cube import PickCubeEnv
@@ -7,6 +8,7 @@ from .pick_single_ycb import PickSingleYCBEnv
 from .plug_charger import PlugChargerEnv
 from .pull_cube import PullCubeEnv
 from .push_cube import PushCubeEnv
+from .push_cube_rand import PushCubeRandEnv
 from .stack_cube import StackCubeEnv
 from .turn_faucet import TurnFaucetEnv
 from .two_robot_pick_cube import TwoRobotPickCube
