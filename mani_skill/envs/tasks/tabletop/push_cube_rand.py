@@ -32,6 +32,7 @@ from mani_skill.utils.registration import register_env
 from mani_skill.utils.scene_builder.table import TableSceneBuilder
 from mani_skill.utils.structs import Pose
 from mani_skill.utils.structs.types import Array, GPUMemoryConfig, SimConfig
+from mani_skill.utils.sapien_utils import look_at
 
 
 @register_env("PushCubeRand-v1", max_episode_steps=50)
@@ -98,11 +99,24 @@ class PushCubeRandEnv(BaseEnv):
 
     @property
     def _default_human_render_camera_configs(self):
-        # registers a more high-definition (512x512) camera used just for rendering when render_mode="rgb_array" or calling env.render_rgb_array()
-        pose = sapien_utils.look_at([0.6, 0.7, 0.6], [0.0, 0.0, 0.35])
-        return CameraConfig(
-            "render_camera", pose=pose, width=256, height=256, fov=1, near=0.01, far=100
-        )
+
+        pose = look_at([0.3, 0, 0.6], [-0.1, 0, 0.1])
+        cam_configs = [CameraConfig("render_camera", pose, 256, 256, np.pi / 2, 0.01, 100)]
+
+        target_bounds = [[-0.3, 0.1], [-0.2, 0.2], [-0.1, 0.3]]
+        # randomly choose centers
+        for i in range(600):
+            azumith = np.random.uniform(-90, 90) / 180 * np.pi
+            elevation = np.random.uniform(30, 60) / 180 * np.pi
+            distance = np.random.uniform(0.45, .7)
+            xyz = np.array([np.cos(azumith) * np.cos(elevation), np.sin(azumith) * np.cos(elevation), np.sin(elevation)]) * distance
+            center = [np.random.uniform(target_bounds[0][0], target_bounds[0][1]),
+                    np.random.uniform(target_bounds[1][0], target_bounds[1][1]),
+                    np.random.uniform(target_bounds[2][0], target_bounds[2][1])]
+            pose = look_at(xyz, center)
+            cam_configs.append(CameraConfig(f"cam_{i}", pose, 256, 256, np.pi / 2, 0.01, 100))
+
+        return cam_configs
 
     def _load_agent(self, options: dict):
         # set a reasonable initial pose for the agent that doesn't intersect other objects

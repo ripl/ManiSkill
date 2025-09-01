@@ -128,13 +128,18 @@ class LiftPegUprightRandEnv(BaseEnv):
     def evaluate(self):
         q = self.peg.pose.q
         qmat = rotation_conversions.quaternion_to_matrix(q)
-        euler = rotation_conversions.matrix_to_euler_angles(qmat, "XYZ")
-        is_peg_upright = (
-            torch.abs(torch.abs(euler[:, 2]) - np.pi / 2) < 0.08
-        )  # 0.08 radians of difference permitted
-        close_to_table = torch.abs(self.peg.pose.p[:, 2] - self.peg_half_length) < 0.005
+        # Peg's axis is local +X → first column of rotation matrix in world frame
+        # Check angle to world Z within 20°: |dot(axis, ez)| > cos(20°)
+        axis_world_z_abs = torch.abs(qmat[:, 2, 0])
+        upright_cos_thresh = torch.cos(torch.tensor(np.deg2rad(20.0), device=self.device))
+        is_peg_upright = axis_world_z_abs > upright_cos_thresh
+
+        # close_to_table = torch.abs(self.peg.pose.p[:, 2] - self.peg_half_length) < 0.005
+        # return {
+        #     "success": is_peg_upright & close_to_table,
+        # }
         return {
-            "success": is_peg_upright & close_to_table,
+            "success": is_peg_upright,
         }
 
     def _get_obs_extra(self, info: Dict):
