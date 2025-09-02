@@ -101,9 +101,9 @@ class PushCubeRandEnv(BaseEnv):
     def _default_human_render_camera_configs(self):
 
         pose = look_at([0.3, 0, 0.6], [-0.1, 0, 0.1])
-        cam_configs = [CameraConfig("render_camera", pose, 256, 256, np.pi / 2, 0.01, 100)]
+        cam_configs = [CameraConfig("render_camera", pose, 256, 256, 1, 0.01, 100)]
 
-        target_bounds = [[-0.3, 0.1], [-0.2, 0.2], [-0.1, 0.3]]
+        target_bounds = [[-0.2, 0], [-0.1, 0.1], [-0.1, 0.3]]
         # randomly choose centers
         for i in range(600):
             azumith = np.random.uniform(-90, 90) / 180 * np.pi
@@ -114,7 +114,7 @@ class PushCubeRandEnv(BaseEnv):
                     np.random.uniform(target_bounds[1][0], target_bounds[1][1]),
                     np.random.uniform(target_bounds[2][0], target_bounds[2][1])]
             pose = look_at(xyz, center)
-            cam_configs.append(CameraConfig(f"cam_{i}", pose, 256, 256, np.pi / 2, 0.01, 100))
+            cam_configs.append(CameraConfig(f"cam_{i}", pose, 256, 256, 1, 0.01, 100))
 
         return cam_configs
 
@@ -169,6 +169,27 @@ class PushCubeRandEnv(BaseEnv):
             initial_pose=sapien.Pose(p=[0, 0, 1e-3]),
         )
 
+        # #### TEMP ######
+        # self.temp_red_cube = actors.build_cube(
+        #     self.scene,
+        #     half_size=self.cube_half_size,
+        #     color=np.array([1.0, 0.0, 0.0, 1.0]),
+        #     name="temp_red_cube",
+        #     body_type="kinematic",
+        #     add_collision=False,
+        #     initial_pose=sapien.Pose(p=[0.0, 0.0, self.cube_half_size]),
+        # )
+        # self.temp_blue_cube = actors.build_cube(
+        #     self.scene,
+        #     half_size=self.cube_half_size,
+        #     color=np.array([0.0, 0.0, 1.0, 1.0]),
+        #     name="temp_blue_cube",
+        #     body_type="kinematic",
+        #     add_collision=False,
+        #     initial_pose=sapien.Pose(p=[-0.1, 0.0, self.cube_half_size]),
+        # )
+        # #### TEMP ######
+
         # optionally you can automatically hide some Actors from view by appending to the self._hidden_objects list. When visual observations
         # are generated or env.render_sensors() is called or env.render() is called with render_mode="sensors", the actor will not show up.
         # This is useful if you intend to add some visual goal sites as e.g. done in PickCube that aren't actually part of the task
@@ -196,17 +217,17 @@ class PushCubeRandEnv(BaseEnv):
             p[:, 2] = -0.9196429
             self.table_scene.table.set_pose(Pose.create_from_pq(p=p, q=q))
 
-            # Randomize cube position (closer to the arm): x in [-0.15, -0.05], y in [-0.2, 0.2]
+            # Randomize cube position (closer to the arm): x in [-0.1, -0.05], y in [-0.2, 0.2]
             xyz = torch.zeros((b, 3))
-            cube_x = torch.rand((b,)) * ( -0.05 - (-0.15) ) + (-0.15)
+            cube_x = torch.rand((b,)) * ( -0.05 - (-0.10) ) + (-0.10)
             cube_y = torch.rand((b,)) * 0.4 - 0.2
             xyz[:, 0] = cube_x
             xyz[:, 1] = cube_y
             xyz[..., 2] = self.cube_half_size
 
-            # Independently sample target position (farther from the arm): x in [0.05, 0.15], y in [-0.2, 0.2]
+            # Independently sample target position (farther from the arm): x in [0.05, 0.1], y in [-0.2, 0.2]
             target_region_xyz = torch.zeros((b, 3))
-            tgt_x = torch.rand((b,)) * (0.15 - 0.05) + 0.05
+            tgt_x = torch.rand((b,)) * (0.10 - 0.05) + 0.05
             tgt_y = torch.rand((b,)) * 0.4 - 0.2
             target_region_xyz[:, 0] = tgt_x
             target_region_xyz[:, 1] = tgt_y
