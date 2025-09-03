@@ -54,7 +54,7 @@ class LiftPegUprightRandEnv(BaseEnv):
         pose = look_at([0.3, 0, 0.6], [-0.1, 0, 0.1])
         cam_configs = [CameraConfig("render_camera", pose, 256, 256, 1, 0.01, 100)]
 
-        target_bounds = [[-0.2, 0], [-0.1, 0.1], [-0.1, 0.3]]
+        target_bounds = [[-0.2, 0], [-0.1, 0.1], [-0.1, 0.1]]
         # randomly choose centers
         for i in range(600):
             azumith = np.random.uniform(-90, 90) / 180 * np.pi
@@ -116,8 +116,11 @@ class LiftPegUprightRandEnv(BaseEnv):
             q = torch.zeros((b, 4), device=self.device)
             q[:, 0] = (angles / 2).cos()
             q[:, 3] = (angles / 2).sin()
+            # Randomize table XY translation: x in [-0.2, 0.2] around base -0.12, y in [-0.2, 0.2]
+            table_xy_shift = torch.rand((b, 2), device=self.device) * 0.4 - 0.2
             p = torch.zeros((b, 3), device=self.device)
-            p[:, 0] = -0.12
+            p[:, 0] = -0.12 + table_xy_shift[:, 0]
+            p[:, 1] = table_xy_shift[:, 1]
             p[:, 2] = -0.9196429
             self.table_scene.table.set_pose(Pose.create_from_pq(p=p, q=q))
 
