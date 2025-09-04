@@ -16,6 +16,7 @@ from .two_robot_stack_cube import TwoRobotStackCube
 from .poke_cube import PokeCubeEnv
 from .place_sphere import PlaceSphereEnv
 from .roll_ball import RollBallEnv
+from .roll_ball_rand import RollBallRandEnv
 from .push_t import PushTEnv
 from .pull_cube_tool import PullCubeToolEnv
 from .stack_pyramid import StackPyramidEnv

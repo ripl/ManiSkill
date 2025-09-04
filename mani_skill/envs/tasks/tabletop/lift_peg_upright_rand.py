@@ -14,7 +14,50 @@ from mani_skill.utils.geometry import rotation_conversions
 from mani_skill.utils.registration import register_env
 from mani_skill.utils.sapien_utils import look_at
 from mani_skill.utils.scene_builder.table import TableSceneBuilder
+from mani_skill.utils.building.ground import build_ground
+from mani_skill.utils.scene_builder.table import scene_builder as table_scene_builder_module
+from pathlib import Path
+import os.path as osp
 from mani_skill.utils.structs.pose import Pose
+
+class DecoupledTableSceneBuilder(TableSceneBuilder):
+    def build(self):
+        model_dir = Path(osp.dirname(table_scene_builder_module.__file__)) / "assets"
+        table_model_file = str(model_dir / "table.glb")
+        visual_scale = [1.75, 1.75, 1.75]
+        base_pose = sapien.Pose(p=[-0.12, 0, -0.9196429], q=euler2quat(0, 0, np.pi / 2))
+
+        # Collision-only actor (fixed)
+        col_builder = self.scene.create_actor_builder()
+        col_builder.add_box_collision(
+            pose=sapien.Pose(p=[0, 0, 0.9196429 / 2]),
+            half_size=(2.418 / 2, 1.209 / 2, 0.9196429 / 2),
+        )
+        col_builder.initial_pose = base_pose
+        table_collision = col_builder.build_kinematic(name="table-collision")
+
+        # Visual fixed
+        vis_fixed_builder = self.scene.create_actor_builder()
+        vis_fixed_builder.add_visual_from_file(filename=table_model_file, scale=visual_scale, pose=sapien.Pose(q=euler2quat(0, 0, np.pi / 2)))
+        vis_fixed_builder.initial_pose = base_pose
+        table_vis_fixed = vis_fixed_builder.build_kinematic(name="table-visual-fixed")
+
+        # Visual randomized
+        vis_rand_builder = self.scene.create_actor_builder()
+        vis_rand_builder.add_visual_from_file(filename=table_model_file, scale=visual_scale, pose=sapien.Pose(q=euler2quat(0, 0, np.pi / 2)))
+        vis_rand_builder.initial_pose = base_pose
+        table_vis_rand = vis_rand_builder.build_kinematic(name="table-visual-rand")
+
+        # Ground
+        floor_width = 100
+        if self.scene.parallel_in_single_scene:
+            floor_width = 500
+        self.ground = build_ground(self.scene, floor_width=floor_width, altitude=-0.9196429)
+
+        self.table = table_collision
+        self.table_collision = table_collision
+        self.table_vis_fixed = table_vis_fixed
+        self.table_vis_rand = table_vis_rand
 from mani_skill.utils.structs.types import Array
 
 
@@ -38,8 +81,9 @@ class LiftPegUprightRandEnv(BaseEnv):
     peg_half_width = 0.025
     peg_half_length = 0.12
 
-    def __init__(self, *args, robot_uids="panda", robot_init_qpos_noise=0.02, **kwargs):
+    def __init__(self, *args, robot_uids="panda", robot_init_qpos_noise=0.02, fixed: bool = False, **kwargs):
         self.robot_init_qpos_noise = robot_init_qpos_noise
+        self.fixed = fixed
         super().__init__(*args, robot_uids=robot_uids, **kwargs)
 
     @property
@@ -74,25 +118,44 @@ class LiftPegUprightRandEnv(BaseEnv):
         super()._load_agent(options, sapien.Pose(p=[-0.615, 0, 0]))
 
     def _load_scene(self, options: dict):
-        self.table_scene = TableSceneBuilder(
+        self.table_scene = DecoupledTableSceneBuilder(
             env=self, robot_init_qpos_noise=self.robot_init_qpos_noise
         )
         self.table_scene.build()
 
-        # Always de-texture the ground grid (patternless white floor)
-        for part in self.table_scene.ground._objs:
-            comp = part.find_component_by_type(sapien.render.RenderBodyComponent)
-            if comp is None:
-                continue
-            for shape in comp.render_shapes:
-                for triangle in shape.parts:
-                    triangle.material.set_base_color(np.array([1.0, 1.0, 1.0, 1.0]))
-                    triangle.material.set_base_color_texture(None)
-                    triangle.material.set_normal_texture(None)
-                    triangle.material.set_emission_texture(None)
-                    triangle.material.set_transmission_texture(None)
-                    triangle.material.set_metallic_texture(None)
-                    triangle.material.set_roughness_texture(None)
+        # Toggle table visuals by fixed
+        def _set_alpha(actor, alpha: float):
+            for part in actor._objs:
+                comp = part.find_component_by_type(sapien.render.RenderBodyComponent)
+                if comp is None:
+                    continue
+                for shape in comp.render_shapes:
+                    for tri in shape.parts:
+                        c = np.array([1.0, 1.0, 1.0, alpha], dtype=np.float32)
+                        tri.material.set_base_color(c)
+
+        if self.fixed:
+            _set_alpha(self.table_scene.table_vis_fixed, 1.0)
+            _set_alpha(self.table_scene.table_vis_rand, 0.0)
+        else:
+            _set_alpha(self.table_scene.table_vis_fixed, 0.0)
+            _set_alpha(self.table_scene.table_vis_rand, 1.0)
+
+        # De-texture the ground grid unless fixed
+        if not self.fixed:
+            for part in self.table_scene.ground._objs:
+                comp = part.find_component_by_type(sapien.render.RenderBodyComponent)
+                if comp is None:
+                    continue
+                for shape in comp.render_shapes:
+                    for triangle in shape.parts:
+                        triangle.material.set_base_color(np.array([1.0, 1.0, 1.0, 1.0]))
+                        triangle.material.set_base_color_texture(None)
+                        triangle.material.set_normal_texture(None)
+                        triangle.material.set_emission_texture(None)
+                        triangle.material.set_transmission_texture(None)
+                        triangle.material.set_metallic_texture(None)
+                        triangle.material.set_roughness_texture(None)
 
         # the peg that we want to manipulate
         self.peg = actors.build_twocolor_peg(
@@ -111,18 +174,17 @@ class LiftPegUprightRandEnv(BaseEnv):
             b = len(env_idx)
             self.table_scene.initialize(env_idx)
 
-            # Randomize table yaw uniformly in [0, 2pi) each initialization (about +Z)
+            # Always randomize the randomized visual table; collision stays at base pose
             angles = torch.rand((b,), device=self.device) * (2 * torch.pi) + np.pi / 2
             q = torch.zeros((b, 4), device=self.device)
             q[:, 0] = (angles / 2).cos()
             q[:, 3] = (angles / 2).sin()
-            # Randomize table XY translation: x in [-0.2, 0.2] around base -0.12, y in [-0.2, 0.2]
             table_xy_shift = torch.rand((b, 2), device=self.device) * 0.4 - 0.2
             p = torch.zeros((b, 3), device=self.device)
             p[:, 0] = -0.12 + table_xy_shift[:, 0]
             p[:, 1] = table_xy_shift[:, 1]
             p[:, 2] = -0.9196429
-            self.table_scene.table.set_pose(Pose.create_from_pq(p=p, q=q))
+            self.table_scene.table_vis_rand.set_pose(Pose.create_from_pq(p=p, q=q))
 
             xyz = torch.zeros((b, 3))
             # Center randomization at (-0.1, 0.0) with the same span (0.2)
