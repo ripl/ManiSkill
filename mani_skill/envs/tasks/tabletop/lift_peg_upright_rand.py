@@ -95,7 +95,7 @@ class LiftPegUprightRandEnv(BaseEnv):
     @property
     def _default_human_render_camera_configs(self):
 
-        pose = look_at([0.3, 0, 0.6], [-0.1, 0, 0.1])
+        pose = look_at([0.5, 0, 0.4], [-0.1, 0, 0.1])
         cam_configs = [CameraConfig("render_camera", pose, 256, 256, 1, 0.01, 100)]
 
         target_bounds = [[-0.2, 0], [-0.1, 0.1], [-0.1, 0.1]]

@@ -154,7 +154,7 @@ class PushCubeRandEnv(BaseEnv):
     @property
     def _default_human_render_camera_configs(self):
 
-        pose = look_at([0.3, 0, 0.6], [-0.1, 0, 0.1])
+        pose = look_at([0.5, 0, 0.4], [-0.1, 0, 0.1])
         cam_configs = [CameraConfig("render_camera", pose, 256, 256, 1, 0.01, 100)]
 
         target_bounds = [[-0.2, 0], [-0.1, 0.1], [-0.2, 0]]
@@ -294,28 +294,36 @@ class PushCubeRandEnv(BaseEnv):
 
             # Do not move the floor; only table visuals and objects are randomized
 
-            # Randomize cube position (closer to the arm): x in [-0.1, -0.05], y in [-0.2, 0.2]
+            # Sample anchor point uniformly in (-0.1, -0.1) to (0.1, 0.1) and shift 0.05m toward the arm (negative x)
+            point_xy = torch.rand((b, 2)) * 0.2 - 0.1
+            point_xy[:, 0] -= 0.05
+            # Sample segment length uniformly in [0.2, 0.3]
+            segment_lengths = torch.rand((b,)) * 0.1 + 0.2
+            one_third = segment_lengths / 3.0
+            two_thirds = segment_lengths * (2.0 / 3.0)
+            # Sample segment rotation uniformly in [0, 2*pi)
+            seg_angles = torch.rand((b,)) * (2 * torch.pi)
+            direction = torch.stack([seg_angles.cos(), seg_angles.sin()], dim=1)
+
+            # Endpoints: cube at 1/3 before point, target at 2/3 after point
+            cube_xy = point_xy - one_third.unsqueeze(1) * direction
+            target_xy = point_xy + two_thirds.unsqueeze(1) * direction
+
+            # Positions on table surface
             xyz = torch.zeros((b, 3))
-            cube_x = torch.rand((b,)) * ( -0.05 - (-0.10) ) + (-0.10)
-            cube_y = torch.rand((b,)) * 0.4 - 0.2
-            xyz[:, 0] = cube_x
-            xyz[:, 1] = cube_y
+            xyz[:, :2] = cube_xy
             xyz[..., 2] = self.cube_half_size
 
-            # Independently sample target position (farther from the arm): x in [0.05, 0.1], y in [-0.2, 0.2]
             target_region_xyz = torch.zeros((b, 3))
-            tgt_x = torch.rand((b,)) * (0.10 - 0.05) + 0.05
-            tgt_y = torch.rand((b,)) * 0.4 - 0.2
-            target_region_xyz[:, 0] = tgt_x
-            target_region_xyz[:, 1] = tgt_y
-            # set a little bit above 0 so the target is sitting on the table
+            target_region_xyz[:, :2] = target_xy
             target_region_xyz[..., 2] = 1e-3
+
             # Orient the cube to face the target (align +X face with direction to target)
             d = target_region_xyz[:, :2] - xyz[:, :2]
-            angles = torch.atan2(d[:, 1], d[:, 0])
+            orient_angles = torch.atan2(d[:, 1], d[:, 0])
             cube_q = torch.zeros((b, 4), device=self.device)
-            cube_q[:, 0] = (angles / 2).cos()
-            cube_q[:, 3] = (angles / 2).sin()
+            cube_q[:, 0] = (orient_angles / 2).cos()
+            cube_q[:, 3] = (orient_angles / 2).sin()
             self.obj.set_pose(Pose.create_from_pq(p=xyz, q=cube_q))
             self.goal_region.set_pose(
                 Pose.create_from_pq(
